@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chores</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      padding: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
+
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+
+    section { margin-bottom: 2rem; }
+
+    .chore-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+
+    .chore {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: #fff;
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+
+    .chore input[type="checkbox"] {
+      width: 1.25rem;
+      height: 1.25rem;
+      accent-color: #2563eb;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .chore-name {
+      flex: 1;
+      font-size: 1rem;
+    }
+
+    .chore.done .chore-name {
+      text-decoration: line-through;
+      color: #999;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: #ccc;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0 0.25rem;
+      line-height: 1;
+    }
+    .delete-btn:hover { color: #e53e3e; }
+
+    .empty { color: #aaa; font-size: 0.9rem; padding: 0.5rem 0; }
+
+    .add-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .add-form input[type="text"] {
+      flex: 1;
+      padding: 0.65rem 0.9rem;
+      border: 1.5px solid #ddd;
+      border-radius: 0.6rem;
+      font-size: 1rem;
+      outline: none;
+      background: #fff;
+    }
+    .add-form input[type="text"]:focus { border-color: #2563eb; }
+
+    .add-form select {
+      padding: 0.65rem 0.5rem;
+      border: 1.5px solid #ddd;
+      border-radius: 0.6rem;
+      font-size: 0.95rem;
+      background: #fff;
+      outline: none;
+      cursor: pointer;
+    }
+    .add-form select:focus { border-color: #2563eb; }
+
+    .add-form button {
+      padding: 0.65rem 1rem;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 0.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .add-form button:active { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <h1>Chores</h1>
+
+  <form class="add-form" id="add-form">
+    <input type="text" id="new-chore-name" placeholder="New chore…" autocomplete="off" required>
+    <select id="new-chore-date">
+      <option value="today">Today</option>
+      <option value="tomorrow">Tomorrow</option>
+    </select>
+    <button type="submit">Add</button>
+  </form>
+
+  <section>
+    <h2>Today</h2>
+    <ul class="chore-list" id="list-today"></ul>
+  </section>
+
+  <section>
+    <h2>Tomorrow</h2>
+    <ul class="chore-list" id="list-tomorrow"></ul>
+  </section>
+
+  <script>
+    function isoDate(offset = 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    const DATES = { today: isoDate(0), tomorrow: isoDate(1) };
+
+    async function loadChores() {
+      for (const [key, date] of Object.entries(DATES)) {
+        const res = await fetch(`/chores?date=${date}`);
+        const chores = await res.json();
+        renderList(document.getElementById(`list-${key}`), chores);
+      }
+    }
+
+    function renderList(ul, chores) {
+      ul.innerHTML = "";
+      if (chores.length === 0) {
+        ul.innerHTML = '<li class="empty">No chores</li>';
+        return;
+      }
+      for (const chore of chores) {
+        const li = document.createElement("li");
+        li.className = "chore" + (chore.done ? " done" : "");
+        li.innerHTML = `
+          <input type="checkbox" ${chore.done ? "checked" : ""} data-id="${chore.id}">
+          <span class="chore-name">${escapeHtml(chore.name)}</span>
+          <button class="delete-btn" data-id="${chore.id}" aria-label="Delete">×</button>
+        `;
+        ul.appendChild(li);
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    document.getElementById("add-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("new-chore-name").value.trim();
+      const dateKey = document.getElementById("new-chore-date").value;
+      if (!name) return;
+      await fetch("/chores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, date: DATES[dateKey] }),
+      });
+      document.getElementById("new-chore-name").value = "";
+      loadChores();
+    });
+
+    document.addEventListener("change", async (e) => {
+      if (!e.target.matches("input[type='checkbox']")) return;
+      const id = e.target.dataset.id;
+      await fetch(`/chores/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: e.target.checked }),
+      });
+      loadChores();
+    });
+
+    document.addEventListener("click", async (e) => {
+      if (!e.target.matches(".delete-btn")) return;
+      const id = e.target.dataset.id;
+      await fetch(`/chores/${id}`, { method: "DELETE" });
+      loadChores();
+    });
+
+    loadChores();
+  </script>
+</body>
+</html>

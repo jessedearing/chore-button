@@ -14,7 +14,7 @@ def get_db():
 
 
 @app.teardown_appcontext
-def close_db(exc):
+def close_db(_):
     db = g.pop("db", None)
     if db is not None:
         db.close()
@@ -59,33 +59,35 @@ def list_chores():
 
 @app.post("/chores")
 def add_chore():
-    data = request.json or {}
+    data: dict[str, str] = request.json or {}
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
     date = data.get("date")
     db = get_db()
     cur = db.execute("INSERT INTO chores (name, date) VALUES (?, ?)", (name, date))
-    db.commit()
+    _ = db.commit()
     return jsonify({"id": cur.lastrowid, "name": name, "done": 0, "date": date}), 201
 
 
 @app.patch("/chores/<int:chore_id>")
-def update_chore(chore_id):
-    data = request.json or {}
+def update_chore(chore_id: int):
+    data: dict[str, str] = request.json or {}
     db = get_db()
     if "done" in data:
-        db.execute(
+        _ = db.execute(
             "UPDATE chores SET done = ? WHERE id = ?",
             (int(bool(data["done"])), chore_id),
         )
     if "name" in data:
-        db.execute(
+        _ = db.execute(
             "UPDATE chores SET name = ? WHERE id = ?", (data["name"].strip(), chore_id)
         )
     if "date" in data:
-        db.execute("UPDATE chores SET date = ? WHERE id = ?", (data["date"], chore_id))
-    db.commit()
+        _ = db.execute(
+            "UPDATE chores SET date = ? WHERE id = ?", (data["date"], chore_id)
+        )
+    _ = db.commit()
     row = db.execute("SELECT * FROM chores WHERE id = ?", (chore_id,)).fetchone()
     if row is None:
         return jsonify({"error": "not found"}), 404
@@ -93,10 +95,10 @@ def update_chore(chore_id):
 
 
 @app.delete("/chores/<int:chore_id>")
-def delete_chore(chore_id):
+def delete_chore(chore_id: int):
     db = get_db()
-    db.execute("DELETE FROM chores WHERE id = ?", (chore_id,))
-    db.commit()
+    _ = db.execute("DELETE FROM chores WHERE id = ?", (chore_id,))
+    _ = db.commit()
     return "", 204
 
 
